@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package VitalOSProtocol;
+
+// --- Java Code Generation Options ---
+option java_package = "co.vitalist.protocol";
+option java_outer_classname = "VitalOSProtocolSettings";
+option java_multiple_files = false;
+
+option optimize_for = LITE_RUNTIME;
+
+// ===================================================================
+// == Time Clock Feature
+// ===================================================================
+
+// App -> Device: Command to set the device's time.
+message SetTime {
+  // Unix timestamp in seconds.
+  int64 timestamp = 1;
+  // IANA timezone identifier, e.g., "America/Vancouver".
+  string timezone_id = 2;
+  // The timezone offset from UTC in seconds.
+  sint32 timezone_offset = 3;
+}
+
+// NOTE: SetTimeRsp is now handled by the common CommandAck message.
+
+// ===================================================================
+// == Find Device Feature
+// ===================================================================
+
+// App -> Device: Command to start or stop the find device alert.
+message FindDevice {
+  bool start = 1; // true to start buzzing, false to stop.
+}
+
+// NOTE: FindDeviceRsp is now handled by the common CommandAck message.

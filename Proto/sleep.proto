@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package VitalOSProtocol;
+
+option java_package = "co.vitalist.protocol";
+option java_outer_classname = "VitalOSProtocolSleep";
+option java_multiple_files = false;
+
+option optimize_for = LITE_RUNTIME;
+
+message SleepSyncRequest {
+  int64 start_timestamp = 1; // Unix timestamp (ms) inclusive
+  int64 end_timestamp = 2;   // Unix timestamp (ms) exclusive
+}
+
+message SleepUpdatedSinceRequest {
+  int64 updated_since_ts = 1; // Unix ms; return days where updated_at_ts >= this
+}
+
+enum SleepStage {
+  AWAKE = 0;
+  LIGHT = 1;
+  DEEP = 2;
+  REM = 3;
+}
+
+// A single derived sleep segment (for timeline rendering).
+message SleepSegment {
+  int64 start_timestamp = 1;
+  int64 end_timestamp = 2;
+  SleepStage stage = 3;
+}
+
+// Lightweight summary for quick queries (weekly charts, BLE sync).
+// Can be used without loading full segments/naps.
+// All total_sleep_ms / light_ms / deep_ms / rem_ms / awake_ms are for MAIN SLEEP ONLY.
+// Nap totals are separate (nap_total_sleep_ms and nap stage breakdown).
+message SleepDaySummary {
+  int64 day_start_ts = 1;
+  int64 day_end_ts = 2;
+  int64 updated_at_ts = 3;
+  int32 timezone_offset_seconds = 4;
+  int32 main_sleep_index = 5;
+  int64 main_sleep_start_ts = 6;
+  int64 main_sleep_end_ts = 7;
+  int64 total_sleep_ms = 8;   // Main sleep only: time in bed (including awake intervals)
+  int64 light_ms = 9;         // Main sleep only
+  int64 deep_ms = 10;         // Main sleep only
+  int64 rem_ms = 11;          // Main sleep only
+  int64 awake_ms = 12;        // Main sleep only: awake in bed during main sleep
+  int32 eligible_sleep_count = 13;
+  string timezone_id = 14;    // Timezone ID (e.g., "GMT", "Europe/London", "America/New_York")
+  // Nap totals (sum across all naps for the day)
+  int64 nap_total_sleep_ms = 15;
+  int64 nap_light_ms = 16;
+  int64 nap_deep_ms = 17;
+  int64 nap_rem_ms = 18;
+  int64 nap_awake_ms = 19;
+}
+
+// Per-day sleep artifact. One file per calendar day (wake-up day / midnight boundary).
+// Continuously overwritten for current day; immutable for past days.
+// Segments carry real event timestamps — no synthetic bucket-splitting.
+message SleepDay {
+  SleepDaySummary summary = 1;
+
+  // Ordered real-timestamp segments for the main (longest/merged) sleep session.
+  // Boundaries come from summary.main_sleep_start_ts / main_sleep_end_ts.
+  repeated SleepSegment main_sleep_segments = 2;
+
+  message Nap {
+    // Ordered real-timestamp segments for this nap.
+    repeated SleepSegment segments = 1;
+    // Actual ENTER / EXIT times for this nap session.
+    int64 start_timestamp = 2;
+    int64 end_timestamp   = 3;
+  }
+  repeated Nap naps = 3;
+}
+
+message SleepDaySyncPayload {
+  SleepDay day = 1;
+}
+
+// Watch -> App: bulk sync response (one command ID; oneof distinguishes day vs terminal complete).
+message SleepSyncComplete {}
+
+message SleepSyncNotification {
+  oneof payload {
+    SleepDaySyncPayload data = 1;
+    SleepSyncComplete complete = 2;
+  }
+}
+
+// A single raw stage-transition event recorded during an in-progress session.
+// stage is the stage we transitioned INTO at timestamp_ms.
+message RawStageChange {
+  int64 timestamp_ms = 1;
+  SleepStage stage = 2;
+}
+
+// In-progress sleep session state for recovery after reboot.
+// Persisted only when a sleep session is active; deleted when sleep completes.
+message CurrentSleepSessionState {
+  int64 day_start_ms = 1;         // Calendar day this session belongs to
+  int64 session_start_ms = 2;     // When ENTER occurred
+  int64 last_stage_change_ms = 3; // Timestamp of most recent stage transition
+  SleepStage current_stage = 4;   // Current stage we're in
+  int64 accumulated_light_ms = 5; // Light sleep duration so far
+  int64 accumulated_deep_ms = 6;  // Deep sleep duration so far
+  int64 accumulated_rem_ms = 7;   // REM sleep duration so far
+  int64 accumulated_awake_ms = 8; // Awake duration so far
+  // Full ordered list of stage transitions (ENTER implicit at session_start_ms with LIGHT).
+  // Used to reconstruct real-timestamp SleepSegment list after reboot.
+  repeated RawStageChange stage_changes = 9;
+}
+
+// =============================================================================
+// NOTIFICATION: Watch -> App notification when sleep data is available/updated
+// =============================================================================
+
+message SleepDataNotification {
+  int64 day_timestamp = 1;        // Day identifier (start of day in millis)
+  bool is_main_sleep_complete = 2; // Main sleep session finished for the day
+  string filename = 3;            // Sleep file identifier/path
+  int32 total_sleep_minutes = 4;  // Total sleep duration in minutes
+}

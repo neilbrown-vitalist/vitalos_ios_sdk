@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package VitalOSProtocol;
+
+// --- Java Code Generation Options ---
+option java_package = "co.vitalist.protocol";
+option java_outer_classname = "VitalOSProtocol";
+option java_multiple_files = false;
+option optimize_for = LITE_RUNTIME;
+
+// ===================================================================
+// == Response Wrapper
+// ===================================================================
+
+
+// An enum for standardized error codes that can be sent in responses.
+// This allows the client app to handle errors programmatically.
+// Error Codes
+//  OK = 0;                 // No error, the command was successful.
+//  UNKNOWN_ERROR = 1;      // A generic, unknown error occurred.
+//  INVALID_COMMAND = 2;    // The command received is not recognized.
+//  INVALID_PARAMETER = 3;  // The parameters for the command were invalid.
+//  INVALID_STATE = 4;      // The device was in the wrong state to execute the command.
+//  NOT_SUPPORTED = 5;      // The feature is not supported on this device/firmware.
+enum VitalOSErrorCode {
+    UNKNOWN_ERROR = 0; // A generic, unknown error occurred.
+    INVALID_COMMAND = 1; // The command received is not recognized.
+    INVALID_PARAMETER = 2; // The parameters for the command were invalid.
+    INVALID_STATE = 3; // The device was in the wrong state to execute the command.
+    UNSUPPORTED = 4; // The feature is not supported on this device/firmware.
+    DEVICE_BUSY = 5; // The device is too busy to process command
+}
+
+// A single, standardized wrapper for ALL solicited responses to commands.
+// This is defined here because it aggregates types from multiple imported files.
+message CommandResponse {
+  // Indicates if the command was successfully processed.
+  bool success = 1;
+
+  // Optional: Provides a human-readable error message if success is false.
+  string error_message = 2;
+  // Optional: Error code
+  VitalOSErrorCode error_code = 3;
+
+  // Optional: Provides a human-readable status message when success is true.
+  string status_message = 6;
+
+  // Optional: Payload of response if command expects data in return
+  bytes payload = 4;
+
+  // Optional: For sync commands, number of records/items to expect (0 = no data).
+  // Sleep sync: number of SleepDay items; health sync: 0 = no data, 1 = data will be streamed.
+  optional int32 record_count = 5;
+}
+
+// ===================================================================
+// == Data Sync & Environment (App -> Watch)
+// ===================================================================
+
+// Empty payload for commands that require no parameters (e.g. enable/disable data sync).
+message Empty {}
+
+// App -> Watch: Set the device environment (prod, qa, dev).
+message SetEnvironment {
+  string env = 1;  // "prod", "qa", or "dev"
+  string custom_url = 2;  // optional override; empty means not set
+}
+
+// App -> Watch: request current device info.
+message GetDeviceInfoRequest {}
+
+// Watch -> App: full device information snapshot.
+message DeviceInfo {
+  string firmware_version = 1;
+  int32 color_id = 2;
+  string sku = 3;
+  string serial_number = 4;
+  string mac_address = 5;
+  string product_code = 6;
+  int32 product_year = 7;
+}
+
+// App -> Watch: request current user profile.
+message GetUserProfileRequest {}
+
+// App <-> Watch: user profile payload.
+message UserProfile {
+  int32 age = 1;
+  int32 sex = 2;
+  int32 height = 3;
+  int32 weight = 4;
+  int32 wearing_hand = 5;
+}

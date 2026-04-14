@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package VitalOSProtocol;
+
+// --- Java Code Generation Options ---
+option java_package = "co.vitalist.protocol";
+option java_outer_classname = "VitalOSProtocolHealth";
+option java_multiple_files = false;
+
+option optimize_for = LITE_RUNTIME;
+
+message HealthAggregatedDataEntry {
+  int64 timestamp = 1;           // Start of the bucket (UTC)
+
+  // HR Data
+  int32 avg_heart_rate = 2;
+  int32 hr_count = 3;
+  int32 max_hr = 4;
+  int32 min_hr = 5;
+
+  // Calorie Data
+  float active_calories = 6;
+  float passive_calories = 7;
+
+  // Step Data
+  int32 steps = 8;
+
+  // HR Zone Durations (in milliseconds)
+  int64 zone_1_duration_ms = 9;
+  int64 zone_2_duration_ms = 10;
+  int64 zone_3_duration_ms = 11;
+  int64 zone_4_duration_ms = 12;
+  int64 zone_5_duration_ms = 13;
+
+  // Oxygen Saturation
+  float spo2 = 14;
+
+  // The total duration this segment was active for
+  int64 active_duration_ms = 15;
+}
+
+message WeeklyHealthSummary {
+  int64 window_start_timestamp = 1;
+  repeated HealthAggregatedDataEntry daily_summaries = 2;
+}
+
+message HealthSyncRequest {
+  int64 start_timestamp = 1; // Unix timestamp (ms) inclusive
+  int64 end_timestamp = 2;   // Unix timestamp (ms) exclusive
+}
+
+message HealthDataUpload {
+  repeated HealthAggregatedDataEntry records = 1;
+}
+
+// Watch -> App: bulk sync response (one command ID; oneof distinguishes chunk vs terminal complete).
+message HealthSyncComplete {}
+
+message HealthSyncNotification {
+  oneof payload {
+    HealthDataUpload data = 1;
+    HealthSyncComplete complete = 2;
+  }
+}
+
+// =============================================================================
+// NOTIFICATION: Watch -> App notification when new health data is available
+// =============================================================================
+
+message HealthDataNotification {
+  int64 start_timestamp = 1;    // Start of available data range (millis since epoch)
+  int64 end_timestamp = 2;      // End of available data range (millis since epoch)
+  int32 record_count = 3;       // Number of records available
+}

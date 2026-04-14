@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package VitalOSProtocol;
+
+// --- Java Code Generation Options ---
+option java_package = "co.vitalist.protocol";
+option java_outer_classname = "VitalOSProtocolLocalMessages";
+option java_multiple_files = false;
+
+option optimize_for = LITE_RUNTIME;
+
+// ===================================================================
+// == Individual Message Definitions
+// ===================================================================
+
+// --- Get Phone Battery ---
+message GetPhoneBatteryRequest {
+  // This request needs no parameters.
+}
+
+message GetPhoneBatteryResponse {
+  // The battery level, from 0 to 100.
+  int32 level = 1;
+}
+
+// --- Get Weather ---
+message GetWeatherRequest {
+  // This request needs no parameters.
+}
+
+// The main message that encapsulates all weather data.
+message GetWeatherResponse {
+  double latitude = 1;
+  double longitude = 2;
+  double elevation = 3;
+  int64 generation_time_ms = 4;
+  int64 utc_offset_ms = 5;
+  int64 timestamp_ms = 6;
+  string timezone = 7;
+  string timezone_abbreviation = 8;
+  CurrentWeatherData current_weather_data = 9;
+  repeated DailyWeatherData daily_data_points = 10;
+  repeated HourlyWeatherData hourly_data_points = 11;
+}
+
+// Represents the current weather conditions.
+message CurrentWeatherData {
+  int64 timestamp_ms = 1;
+  double temperature_2m = 2;
+  double relative_humidity_2m = 3;
+  int32 weather_code = 4;
+  double wind_speed_10m = 5;
+  double wind_direction_10m = 6;
+
+  // Air Quality Index (AQI)
+  int32 aqi = 7;
+
+  // Particulate matter smaller than 2.5 µm
+  int32 pm25 = 8;
+}
+
+// Represents a single point of hourly forecast data.
+message HourlyWeatherData {
+  int64 timestamp_ms = 1;
+  double temperature_2m = 2;
+  double relative_humidity_2m = 3;
+  int32 weather_code = 4;
+  double visibility = 5;
+  double wind_speed_10m = 6;
+  double uv_index = 7;
+}
+
+// Represents a single point of daily forecast data.
+message DailyWeatherData {
+  int64 timestamp_ms = 1;
+  int32 weather_code = 2;
+  double temperature_2m_max = 3;
+  double temperature_2m_min = 4;
+  int64 sunrise_ms = 5;
+  int64 sunset_ms = 6;
+  double precipitation_sum = 7;
+  double uv_index_max = 8;
+  double wind_speed_10m_max = 9;
+}
+
+// ===================================================================
+// == Top-Level Wrappers (Routers)
+// ===================================================================
+
+/// A wrapper for any local message request sent FROM the watch TO the phone.
+message LocalRequest {
+  oneof payload {
+    GetPhoneBatteryRequest get_phone_battery = 1;
+    GetWeatherRequest get_weather = 2;
+  }
+}
+
+/// A wrapper for any local message response sent FROM the phone TO the watch.
+message LocalResponse {
+  oneof payload {
+    GetPhoneBatteryResponse get_phone_battery = 1;
+    GetWeatherResponse get_weather = 2;
+  }
+}

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package VitalOSProtocol;
+
+// --- Java Code Generation Options ---
+option java_package = "co.vitalist.protocol";
+option java_outer_classname = "VitalOSProtocolSettingsConfiguration";
+option java_multiple_files = false;
+
+option optimize_for = LITE_RUNTIME;
+
+// The top-level configuration.
+// It contains flat lists of all available settings.
+message SettingsConfiguration {
+  repeated SettingsEntry all_settings = 1;
+  // The client app will use these lists to construct the UI.
+}
+
+// Defines a single setting.
+message SettingsEntry {
+  enum SettingType {
+    SETTING_TYPE_UNSPECIFIED = 0;
+    TOGGLE = 1;
+    ENUM = 2;
+    RANGE = 3;
+    CUSTOM = 4;
+    BUTTON = 5;
+    INFO = 6;
+    GROUP = 7;
+  }
+
+  string setting_id = 1;      // Unique identifier, e.g., "brightness_setting"
+  string display_name = 2;  // Text shown on screen, e.g., "Brightness"
+  SettingType type = 3;       // The UI control to render
+
+  // A list of group IDs where this setting should be displayed.
+  repeated string group_ids = 4;
+
+  oneof value {
+    bool bool_value = 5;
+    int32 int_value = 6;
+    string string_value = 7;
+  }
+
+  repeated string enum_options = 8;
+  int32 min_value = 9;
+  int32 max_value = 10;
+  bool is_required = 11;
+  int32 interval = 12;
+  string icon_path = 13;
+  bool is_enabled = 14;
+  bool is_hidden = 15;
+  int64 last_updated = 16;
+}
+
+message SettingsValue {
+  string setting_id = 1; // Unique identifier for the setting being updated, e.g., "brightness"
+
+  // The updated value for the setting. Uses a oneof to support different data types.
+  oneof value {
+    bool bool_value = 2;   // For boolean settings (e.g., TOGGLE type)
+    int32 int_value = 3;    // For integer settings (e.g., brightness level, enum index)
+    string string_value = 4; // For string settings (e.g., text inputs)
+
+  }
+  int64 last_updated = 5;
+}
+
+message GetUpdatedSettingsRequest {
+  int64 since_timestamp = 1;
+}
+
+message GetUpdatedSettingsResponse {
+  repeated SettingsEntry updated_entries = 1;
+}
+
+message GetUpdatedValuesRequest {
+  int64 since_timestamp = 1;
+}
+
+message GetUpdatedValuesResponse {
+  repeated SettingsValue updated_values = 1;
+}
