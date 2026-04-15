@@ -22,7 +22,7 @@ Add the package as a local dependency or via Git URL:
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/your-org/vitalos-ios.git", from: "0.1.0"),
+    .package(url: "https://github.com/your-org/vitalos-ios.git", from: "0.0.1"),
 ]
 ```
 
