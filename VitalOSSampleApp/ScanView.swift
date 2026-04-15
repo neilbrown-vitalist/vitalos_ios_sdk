@@ -41,6 +41,9 @@ struct ScanView: View {
                     }
                 }
             }
+            .onDisappear {
+                viewModel.stopScan()
+            }
             .navigationDestination(for: CBPeripheral.self) { peripheral in
                 DeviceView(
                     peripheral: peripheral,
@@ -59,7 +62,11 @@ final class ScanViewModel: NSObject, ObservableObject, CBCentralManagerDelegate 
 
     let connectionProvider = CoreBluetoothConnectionProvider()
     private var centralManager: CBCentralManager!
-    private let serviceUUID = CBUUID(string: VitalOsProtocol.serviceUUIDString)
+
+    private static let manufacturerIdBytes: [UInt8] = [
+        UInt8(VitalOsProtocol.manufacturerId & 0xFF),
+        UInt8(VitalOsProtocol.manufacturerId >> 8)
+    ]
 
     override init() {
         super.init()
@@ -67,25 +74,46 @@ final class ScanViewModel: NSObject, ObservableObject, CBCentralManagerDelegate 
     }
 
     func startScan() {
-        guard centralManager.state == .poweredOn else { return }
+        guard centralManager.state == .poweredOn else {
+            print("[ScanVM] Cannot scan — central state: \(centralManager.state.rawValue)")
+            return
+        }
         discoveredDevices.removeAll()
         isScanning = true
-        centralManager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        centralManager.scanForPeripherals(
+            withServices: nil,
+            options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
+        )
+        print("[ScanVM] Scanning for VitalOS devices (manufacturer ID 0x\(String(format: "%04X", VitalOsProtocol.manufacturerId)))")
     }
 
     func stopScan() {
+        guard isScanning else { return }
         centralManager.stopScan()
         isScanning = false
+        print("[ScanVM] Scanning stopped (\(discoveredDevices.count) devices found)")
     }
 
+    private func isVitalOsDevice(_ advertisementData: [String: Any]) -> Bool {
+        guard let mfgData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data,
+              mfgData.count >= 2 else { return false }
+        return mfgData[0] == Self.manufacturerIdBytes[0]
+            && mfgData[1] == Self.manufacturerIdBytes[1]
+    }
+
+    // MARK: CBCentralManagerDelegate
+
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        print("[ScanVM] Central state changed: \(central.state.rawValue)")
         if central.state == .poweredOn && isScanning {
             startScan()
         }
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        guard isVitalOsDevice(advertisementData) else { return }
         if !discoveredDevices.contains(where: { $0.identifier == peripheral.identifier }) {
+            print("[ScanVM] Discovered: \(peripheral.name ?? "Unknown") (\(peripheral.identifier))")
             discoveredDevices.append(peripheral)
             connectionProvider.register(peripheral: peripheral)
         }

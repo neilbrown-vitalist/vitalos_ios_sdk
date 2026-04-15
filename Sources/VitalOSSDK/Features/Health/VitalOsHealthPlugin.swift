@@ -58,24 +58,36 @@ public final class VitalOsHealthPlugin: HealthPlugin, @unchecked Sendable {
 
         router.registerNotificationHandler(commandId: VitalOsCommand.healthSyncNotification.rawValue) { [weak self] in
             HealthSyncNotificationHandler(
-                onDataChunk: { upload in self?.activeHealthSync?.chunks.append(upload) },
+                onDataChunk: { upload in self?.activeHealthSync?.appendChunk(upload) },
                 onComplete: {
-                    guard let self, let sync = self.activeHealthSync else { return }
-                    self.activeHealthSync = nil
-                    sync.continuation?.resume(returning: sync.chunks)
-                    sync.continuation = nil
+                    guard let self else { return }
+                    self.healthSyncLock.lock()
+                    guard let sync = self.activeHealthSync else {
+                        self.healthSyncLock.unlock()
+                        return
+                    }
+                    let resumed = sync.markComplete()
+                    if resumed { self.activeHealthSync = nil }
+                    self.healthSyncLock.unlock()
+                    self.logger.info("Health sync notification complete (resumed=\(resumed), chunks=\(sync.chunkCount))")
                 }
             )
         }
 
         router.registerNotificationHandler(commandId: VitalOsCommand.sleepSyncNotification.rawValue) { [weak self] in
             SleepSyncNotificationHandler(
-                onDay: { day in self?.activeSleepSync?.days.append(day) },
+                onDay: { day in self?.activeSleepSync?.appendDay(day) },
                 onComplete: {
-                    guard let self, let sync = self.activeSleepSync else { return }
-                    self.activeSleepSync = nil
-                    sync.continuation?.resume(returning: sync.days)
-                    sync.continuation = nil
+                    guard let self else { return }
+                    self.sleepSyncLock.lock()
+                    guard let sync = self.activeSleepSync else {
+                        self.sleepSyncLock.unlock()
+                        return
+                    }
+                    let resumed = sync.markComplete()
+                    if resumed { self.activeSleepSync = nil }
+                    self.sleepSyncLock.unlock()
+                    self.logger.info("Sleep sync notification complete (resumed=\(resumed), days=\(sync.dayCount))")
                 }
             )
         }
@@ -107,23 +119,28 @@ public final class VitalOsHealthPlugin: HealthPlugin, @unchecked Sendable {
         request.startTimestamp = Int64(from.timeIntervalSince1970 * 1000)
         request.endTimestamp = Int64(to.timeIntervalSince1970 * 1000)
 
+        logger.info("Requesting health data (\(request.startTimestamp)...\(request.endTimestamp))")
+
         let response = try await rm.sendRequestAndWait(
             commandId: VitalOsCommand.syncHealthData.rawValue,
             command: request
         )
+
+        logger.info("Health sync response: success=\(response.success), hasRecordCount=\(response.hasRecordCount), recordCount=\(response.recordCount)")
 
         if !response.success {
             throw VitalOsError.unknown("Health sync command failed: \(response.errorMessage)")
         }
 
         if response.hasRecordCount && response.recordCount == 0 {
+            logger.info("Health sync: device reports 0 records")
             return []
         }
 
         return try await withThrowingTaskGroup(of: [HealthDataUpload].self) { group in
             group.addTask {
                 try await withCheckedThrowingContinuation { continuation in
-                    sync.continuation = continuation
+                    sync.setContinuation(continuation)
                 }
             }
 
@@ -186,20 +203,25 @@ public final class VitalOsHealthPlugin: HealthPlugin, @unchecked Sendable {
 
         guard let rm = requestManager else { throw VitalOsError.disconnected }
 
+        logger.info("Requesting sleep data (commandId=0x\(String(commandId, radix: 16)))")
+
         let response = try await rm.sendRequestAndWait(commandId: commandId, command: command)
+
+        logger.info("Sleep sync response: success=\(response.success), hasRecordCount=\(response.hasRecordCount), recordCount=\(response.recordCount)")
 
         if !response.success {
             throw VitalOsError.unknown("Sleep sync command failed: \(response.errorMessage)")
         }
 
         if response.hasRecordCount && response.recordCount == 0 {
+            logger.info("Sleep sync: device reports 0 records")
             return []
         }
 
         return try await withThrowingTaskGroup(of: [SleepDay].self) { group in
             group.addTask {
                 try await withCheckedThrowingContinuation { continuation in
-                    sync.continuation = continuation
+                    sync.setContinuation(continuation)
                 }
             }
 
@@ -217,7 +239,7 @@ public final class VitalOsHealthPlugin: HealthPlugin, @unchecked Sendable {
     // MARK: - Disconnect / Dispose
 
     public func onDeviceDisconnected(_ device: VitalOsDevice) async {
-        logger.debug("Device disconnected")
+        logger.info("Device disconnected — cancelling active syncs")
         cancelActiveSync()
         requestManager = nil
     }
@@ -228,23 +250,122 @@ public final class VitalOsHealthPlugin: HealthPlugin, @unchecked Sendable {
     }
 
     private func cancelActiveSync() {
-        activeHealthSync?.continuation?.resume(throwing: VitalOsError.disconnected)
+        activeHealthSync?.cancel(error: VitalOsError.disconnected)
         activeHealthSync = nil
-        activeSleepSync?.continuation?.resume(throwing: VitalOsError.disconnected)
+        activeSleepSync?.cancel(error: VitalOsError.disconnected)
         activeSleepSync = nil
     }
 }
 
 // MARK: - Active Sync State
 
+/// Thread-safe sync state that handles the race between the notification-driven
+/// `markComplete()` and the response-driven `setContinuation()`.
+///
+/// The device may send the "complete" notification before the SDK processes
+/// the command response and installs the continuation. `markComplete()` buffers
+/// the signal so `setContinuation()` can resume immediately when it arrives.
 private final class ActiveHealthSync {
-    var chunks: [HealthDataUpload] = []
-    var continuation: CheckedContinuation<[HealthDataUpload], Error>?
+    private let lock = NSLock()
+    private var chunks: [HealthDataUpload] = []
+    private var _continuation: CheckedContinuation<[HealthDataUpload], Error>?
+    private var completed = false
+
+    var chunkCount: Int { lock.withLock { chunks.count } }
+
+    func appendChunk(_ upload: HealthDataUpload) {
+        lock.lock()
+        chunks.append(upload)
+        lock.unlock()
+    }
+
+    func setContinuation(_ continuation: CheckedContinuation<[HealthDataUpload], Error>) {
+        lock.lock()
+        if completed {
+            let result = chunks
+            lock.unlock()
+            continuation.resume(returning: result)
+        } else {
+            _continuation = continuation
+            lock.unlock()
+        }
+    }
+
+    /// Returns `true` if the continuation was resumed, `false` if completion was buffered.
+    @discardableResult
+    func markComplete() -> Bool {
+        lock.lock()
+        completed = true
+        if let cont = _continuation {
+            _continuation = nil
+            let result = chunks
+            lock.unlock()
+            cont.resume(returning: result)
+            return true
+        }
+        lock.unlock()
+        return false
+    }
+
+    func cancel(error: Error) {
+        lock.lock()
+        let cont = _continuation
+        _continuation = nil
+        lock.unlock()
+        cont?.resume(throwing: error)
+    }
 }
 
+/// Thread-safe sync state — see ``ActiveHealthSync`` for design rationale.
 private final class ActiveSleepSync {
-    var days: [SleepDay] = []
-    var continuation: CheckedContinuation<[SleepDay], Error>?
+    private let lock = NSLock()
+    private var days: [SleepDay] = []
+    private var _continuation: CheckedContinuation<[SleepDay], Error>?
+    private var completed = false
+
+    var dayCount: Int { lock.withLock { days.count } }
+
+    func appendDay(_ day: SleepDay) {
+        lock.lock()
+        days.append(day)
+        lock.unlock()
+    }
+
+    func setContinuation(_ continuation: CheckedContinuation<[SleepDay], Error>) {
+        lock.lock()
+        if completed {
+            let result = days
+            lock.unlock()
+            continuation.resume(returning: result)
+        } else {
+            _continuation = continuation
+            lock.unlock()
+        }
+    }
+
+    /// Returns `true` if the continuation was resumed, `false` if completion was buffered.
+    @discardableResult
+    func markComplete() -> Bool {
+        lock.lock()
+        completed = true
+        if let cont = _continuation {
+            _continuation = nil
+            let result = days
+            lock.unlock()
+            cont.resume(returning: result)
+            return true
+        }
+        lock.unlock()
+        return false
+    }
+
+    func cancel(error: Error) {
+        lock.lock()
+        let cont = _continuation
+        _continuation = nil
+        lock.unlock()
+        cont?.resume(throwing: error)
+    }
 }
 
 // MARK: - Notification Handlers

@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -38,12 +38,12 @@
 		A1000050229A0001 = {
 			isa = PBXGroup;
 			children = (
-				A1000051229A0001 /* VitalOSSampleApp */,
+				A1000051229A0001 /*  */,
 				A1000052229A0001 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A1000051229A0001 /* VitalOSSampleApp */ = {
+		A1000051229A0001 /*  */ = {
 			isa = PBXGroup;
 			children = (
 				A1000011229A0001 /* VitalOSSampleApp.swift */,
@@ -51,7 +51,7 @@
 				A1000013229A0001 /* DeviceView.swift */,
 				A1000014229A0001 /* Info.plist */,
 			);
-			path = "";
+			name = "";
 			sourceTree = "<group>";
 		};
 		A1000052229A0001 /* Products */ = {
@@ -258,6 +258,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 34PS25MJ68;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "VitalOS Sample";
@@ -266,6 +267,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -285,6 +287,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 34PS25MJ68;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "VitalOS Sample";
@@ -293,6 +296,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -309,15 +313,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A1000090229A0001 /* Build configuration list for PBXProject "VitalOSSampleApp" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A10000A1229A0001 /* Debug */,
-				A10000A2229A0001 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		A1000070229A0001 /* Build configuration list for PBXNativeTarget "VitalOSSampleApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -327,12 +322,21 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A1000090229A0001 /* Build configuration list for PBXProject "VitalOSSampleApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000A1229A0001 /* Debug */,
+				A10000A2229A0001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
 		A1000030229A0001 /* XCLocalSwiftPackageReference ".." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "..";
+			relativePath = ..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -346,7 +350,6 @@
 			productName = VitalOSBLE;
 		};
 /* End XCSwiftPackageProductDependency section */
-
 	};
 	rootObject = A1000080229A0001 /* Project object */;
 }

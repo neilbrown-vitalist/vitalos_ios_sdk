@@ -126,6 +126,9 @@ struct DeviceView: View {
         }
         .navigationTitle(peripheral.name ?? "Device")
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear {
+            Task { await viewModel.dispose() }
+        }
     }
 
     private func formatMs(_ ms: Int64) -> String {
@@ -164,12 +167,11 @@ final class DeviceViewModel: ObservableObject {
         let health = VitalOsHealthPlugin()
         self.healthPlugin = health
 
-        self.device = VitalOsDeviceImpl(
+        self.device = createVitalOsDevice(
             connectionProvider: connectionProvider,
-            id: peripheral.identifier.uuidString,
-            initialName: peripheral.name ?? "VitalOS Device",
-            plugins: [messaging, health],
-            environment: nil
+            deviceId: peripheral.identifier.uuidString,
+            name: peripheral.name ?? "VitalOS Device",
+            plugins: [messaging, health]
         )
 
         device.connectionState
@@ -193,6 +195,11 @@ final class DeviceViewModel: ObservableObject {
         await device.disconnect()
         healthRecords = []
         sleepDays = []
+    }
+
+    func dispose() async {
+        await device.disconnect()
+        await device.dispose()
     }
 
     func syncHealthData() async {

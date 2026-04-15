@@ -42,34 +42,34 @@ public protocol VitalOsDevice: AnyObject {
     /// Returns `true` if a plugin of the given type is registered.
     func hasPlugin<T: VitalOsPlugin>(_ type: T.Type) -> Bool
 
-    /// Factory method.
-    static func create(
-        connectionProvider: BleConnectionProvider,
-        deviceId: String,
-        name: String,
-        plugins: [VitalOsPlugin],
-        environment: String?
-    ) -> VitalOsDevice
 }
 
 public extension VitalOsDevice {
     func getPlugin<T: VitalOsPlugin>() -> T? {
         getPlugin(T.self)
     }
+}
 
-    static func create(
-        connectionProvider: BleConnectionProvider,
-        deviceId: String,
-        name: String = "VitalOS Device",
-        plugins: [VitalOsPlugin] = [],
-        environment: String? = nil
-    ) -> VitalOsDevice {
-        VitalOsDeviceImpl(
-            connectionProvider: connectionProvider,
-            id: deviceId,
-            initialName: name,
-            plugins: plugins,
-            environment: environment
-        )
-    }
+/// Creates a ``VitalOsDevice`` instance.
+///
+/// - Parameters:
+///   - connectionProvider: The BLE connection provider to use.
+///   - deviceId: The UUID string of the target device.
+///   - name: Optional display name for the device.
+///   - plugins: Additional plugins to register alongside the defaults.
+///   - environment: Optional environment tag sent to the device on connect (e.g. "prod").
+public func createVitalOsDevice(
+    connectionProvider: BleConnectionProvider,
+    deviceId: String,
+    name: String = "VitalOS Device",
+    plugins: [VitalOsPlugin] = [],
+    environment: String? = nil
+) -> VitalOsDevice {
+    VitalOsDeviceImpl(
+        connectionProvider: connectionProvider,
+        id: deviceId,
+        initialName: name,
+        plugins: plugins,
+        environment: environment
+    )
 }

@@ -81,8 +81,9 @@ final class VitalOsDeviceImpl: VitalOsDevice, @unchecked Sendable {
         connectionState.send(.connecting)
 
         do {
-            logger.info("[\(self.id)] Connecting...")
+            logger.info("[\(self.id)] Connecting via BLE provider...")
             let bleTransport = try await connectionProvider.connect(deviceId: id)
+            logger.info("[\(self.id)] BLE transport ready, building protocol stack...")
 
             let t = VitalOsTransportLayer(bleTransport: bleTransport)
             let sr = VitalOsStreamRouter(transport: t)
@@ -94,6 +95,7 @@ final class VitalOsDeviceImpl: VitalOsDevice, @unchecked Sendable {
             self.requestManager = rm
             self.commandRouter = cr
 
+            logger.info("[\(self.id)] Starting transport listener...")
             try await t.startListening()
 
             // 1. Settings plugin first
@@ -188,16 +190,13 @@ final class VitalOsDeviceImpl: VitalOsDevice, @unchecked Sendable {
     }
 
     func disconnect() async {
-        logger.info("[\(self.id)] Disconnect requested")
-        guard !isExplicitlyConnecting else {
-            logger.warning("[\(self.id)] Disconnect called while connecting — ignoring")
-            return
-        }
+        logger.info("[\(self.id)] Disconnect requested (connecting=\(self.isExplicitlyConnecting), stackInit=\(self.isStackInitialized))")
         do {
             try await connectionProvider.disconnect(deviceId: id)
         } catch {
             logger.warning("[\(self.id)] Error during disconnect: \(error.localizedDescription)")
         }
+        isExplicitlyConnecting = false
         await cleanupStack()
         connectionState.send(.disconnected)
     }
@@ -212,9 +211,12 @@ final class VitalOsDeviceImpl: VitalOsDevice, @unchecked Sendable {
     }
 
     func dispose() async {
-        guard !disposed else { return }
+        guard !disposed else {
+            logger.debug("[\(self.id)] Dispose ignored: already disposed")
+            return
+        }
         disposed = true
-        logger.debug("[\(self.id)] Disposing")
+        logger.info("[\(self.id)] Disposing (connecting=\(self.isExplicitlyConnecting), stackInit=\(self.isStackInitialized))")
         await cleanupStack()
         connectionStateTask?.cancel()
         bondStateTask?.cancel()
@@ -222,6 +224,7 @@ final class VitalOsDeviceImpl: VitalOsDevice, @unchecked Sendable {
         for plugin in pluginMap.values where plugin !== settingsPlugin {
             await plugin.dispose()
         }
+        logger.info("[\(self.id)] Dispose complete")
     }
 
     private func cleanupStack() async {
