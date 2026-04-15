@@ -1,2 +1,3 @@
 .build/
 .swiftpm/
+VitalOSSampleApp/VitalOSSampleApp.xcodeproj/project.xcworkspace/xcuserdata/**
